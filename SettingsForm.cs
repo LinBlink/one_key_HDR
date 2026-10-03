@@ -74,12 +74,19 @@ internal sealed class SettingsForm : Form
         void LoadRates(uint a, uint b)
         {
             rateA.Items.Clear(); rateB.Items.Clear();
-            rateA.Items.Add(new DisplayOption("0", "自动：最低刷新率"));
+            rateA.Items.Add(new DisplayOption("0", "自动：优先 60 Hz"));
             rateB.Items.Add(new DisplayOption("0", "自动：最高刷新率"));
             try
             {
                 var target = RefreshRateService.Resolve(((DisplayOption)refreshDisplay.SelectedItem!).Path);
-                foreach (var rate in RefreshRateService.Rates(target.Device))
+                var rates = RefreshRateService.Rates(target.Device);
+                if (rates.Count >= 2)
+                {
+                    var automatic = RefreshRateService.ResolveRates(new Settings(), rates);
+                    rateA.Items[0] = new DisplayOption("0", $"自动：{automatic.A} Hz（低档）");
+                    rateB.Items[0] = new DisplayOption("0", $"自动：{automatic.B} Hz（高档）");
+                }
+                foreach (var rate in rates)
                 {
                     rateA.Items.Add(new DisplayOption(rate.ToString(), $"{rate} Hz"));
                     rateB.Items.Add(new DisplayOption(rate.ToString(), $"{rate} Hz"));

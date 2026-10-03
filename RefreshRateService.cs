@@ -80,16 +80,25 @@ internal static class RefreshRateService
         return rates.ToList();
     }
 
+    internal static (uint A, uint B) ResolveRates(Settings settings, IReadOnlyList<uint> rates)
+    {
+        if (rates.Count < 2) throw new InvalidOperationException("当前分辨率下没有两档可切换的刷新率。");
+        var highest = rates.Max();
+        // Prefer the common desktop rate, retaining a distinct low/high pair on 60 Hz panels.
+        var automaticLow = rates.Contains(60u) && highest > 60 ? 60u : rates.Min();
+        var a = settings.RefreshRateA == 0 ? automaticLow : settings.RefreshRateA;
+        var b = settings.RefreshRateB == 0 ? highest : settings.RefreshRateB;
+        if (a == b || !rates.Contains(a) || !rates.Contains(b))
+            throw new InvalidOperationException("所选刷新率不适用于当前分辨率，请重新设置两档刷新率。");
+        return (a, b);
+    }
+
     public static uint Toggle(Settings settings)
     {
         var display = Resolve(settings.RefreshDisplay);
         var mode = Current(display.Device);
         var rates = Rates(display.Device);
-        if (rates.Count < 2) throw new InvalidOperationException("当前分辨率下没有两档可切换的刷新率。");
-        var a = settings.RefreshRateA == 0 ? rates[0] : settings.RefreshRateA;
-        var b = settings.RefreshRateB == 0 ? rates[^1] : settings.RefreshRateB;
-        if (a == b || !rates.Contains(a) || !rates.Contains(b))
-            throw new InvalidOperationException("所选刷新率不适用于当前分辨率，请重新设置两档刷新率。");
+        var (a, b) = ResolveRates(settings, rates);
         var target = mode.Frequency == b ? a : b;
         mode.Frequency = target;
         mode.Fields = 0x400000; // DM_DISPLAYFREQUENCY: preserve resolution and desktop layout.
